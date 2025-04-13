@@ -1,6 +1,6 @@
 # 📝 Simple To-Do App
 
-This is a basic to-do list application built using **React**. It's one of my very first projects as I begin my journey into full-stack web development.
+This is a basic to-do list application built using **React** and **Tailwind**. It's one of my very first projects as I begin my journey into full-stack web development.
 
 ## 🚀 Features
 

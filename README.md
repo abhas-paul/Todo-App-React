@@ -18,5 +18,5 @@ This is a basic to-do list application built using **React** and **Tailwind**. I
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/your-username/todo-app.git
-   cd todo-app
+   git clone (repo-link)
+   cd (repo-name)

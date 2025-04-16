@@ -12,7 +12,7 @@ This is a basic to-do list application built using **React** and **Tailwind**. I
 ## 🛠️ Tech Stack
 
 - **React** (with functional components and hooks)
-- HTML & Tailwind
+- **HTML, CSS & Tailwind**
 
 ## 📦 Installation
 

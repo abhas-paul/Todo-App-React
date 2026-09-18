@@ -1,220 +1,247 @@
-import { useState, useEffect, useRef } from 'react';
-import './App.css';
-import './util.css';
-import { createRoot } from 'react-dom/client';
-import add from './assets/plus.svg';
-import edit from './assets/edit.svg';
-import del from './assets/delete.svg';
+import { useState, useEffect } from 'react';
 
-function App() {
-  // State to hold current date
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [tasks, setTasks] = useState([]);
-  const [newTask, setNewTask] = useState('');
-  const dialogRef = useRef(null);
-  const [editingIndex, setEditingIndex] = useState(null);
-  const [editedTask, setEditedTask] = useState('');
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [completedTasks, setCompletedTasks] = useState([]);
+export default function App() {
+  // LocalStorage Persistence
+  const [todos, setTodos] = useState(() => {
+    const saved = localStorage.getItem('todo_app_tasks');
+    return saved
+      ? JSON.parse(saved)
+      : [
+          { id: '1', text: 'Set up Vite + React + Tailwind v4', completed: true, priority: 'high' },
+          { id: '2', text: 'Deploy to GitHub Pages via Actions', completed: true, priority: 'medium' },
+          { id: '3', text: 'Add task priorities and local storage', completed: false, priority: 'high' },
+        ];
+  });
 
-  // Update date every minute
+  const [inputText, setInputText] = useState('');
+  const [priority, setPriority] = useState('medium');
+  const [filter, setFilter] = useState('all');
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState('');
+
+  // Sync with LocalStorage
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentDate(new Date());
-    }, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    localStorage.setItem('todo_app_tasks', JSON.stringify(todos));
+  }, [todos]);
 
-  // Load saved tasks and completed tasks from localStorage
-  useEffect(() => {
-    const storedTasks = JSON.parse(localStorage.getItem('tasks')) || [];
-    const storedCompleted = JSON.parse(localStorage.getItem('completedTasks')) || [];
-    setTasks(storedTasks);
-    setCompletedTasks(storedCompleted);
-  }, []);
-
-  // Pad single digits with 0
-  const pad = (n) => (n < 10 ? '0' + n : n);
-  const day = pad(currentDate.getDate());
-  const month = pad(currentDate.getMonth() + 1);
-  const year = currentDate.getFullYear();
-
-  const openDialog = () => {
-    if (dialogRef.current) dialogRef.current.showModal();
+  // Actions
+  const addTodo = (e) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
+    const newTodo = {
+      id: Date.now().toString(),
+      text: inputText.trim(),
+      completed: false,
+      priority,
+    };
+    setTodos([newTodo, ...todos]);
+    setInputText('');
   };
 
-  const handleAddTask = () => {
-    if (newTask.trim() !== '') {
-      const updatedTasks = [...tasks, newTask];
-      setTasks(updatedTasks);
-      setNewTask('');
-      localStorage.setItem('tasks', JSON.stringify(updatedTasks));
-      dialogRef.current?.close();
-    }
+  const toggleTodo = (id) => {
+    setTodos(
+      todos.map((todo) =>
+        todo.id === id ? { ...todo, completed: !todo.completed } : todo
+      )
+    );
   };
 
-  const handleDel = (index) => {
-    const updatedTasks = tasks.filter((_, i) => i !== index);
-    setTasks(updatedTasks);
-    setCompletedTasks(completedTasks.filter(i => i !== index));
-    localStorage.setItem('tasks', JSON.stringify(updatedTasks));
-    localStorage.setItem('completedTasks', JSON.stringify(completedTasks.filter(i => i !== index)));
+  const deleteTodo = (id) => {
+    setTodos(todos.filter((todo) => todo.id !== id));
   };
 
-  const handleEdit = (index) => {
-    setEditingIndex(index);
-    setEditedTask(tasks[index]);
+  const startEditing = (todo) => {
+    setEditingId(todo.id);
+    setEditText(todo.text);
   };
 
-  const saveEdit = (index) => {
-    if (editedTask.trim() !== '') {
-      const updatedTasks = [...tasks];
-      updatedTasks[index] = editedTask;
-      setTasks(updatedTasks);
-      localStorage.setItem('tasks', JSON.stringify(updatedTasks));
-      setEditingIndex(null);
-    }
+  const saveEdit = (id) => {
+    if (!editText.trim()) return;
+    setTodos(
+      todos.map((todo) =>
+        todo.id === id ? { ...todo, text: editText.trim() } : todo
+      )
+    );
+    setEditingId(null);
   };
 
-  const cancelEdit = () => {
-    setEditingIndex(null);
+  const clearCompleted = () => {
+    setTodos(todos.filter((todo) => !todo.completed));
   };
 
-  const handleTaskToggle = (index) => {
-    let updatedCompleted;
-    if (completedTasks.includes(index)) {
-      updatedCompleted = completedTasks.filter(i => i !== index);
-    } else {
-      updatedCompleted = [...completedTasks, index];
-    }
-    setCompletedTasks(updatedCompleted);
-    localStorage.setItem('completedTasks', JSON.stringify(updatedCompleted));
-  };
+  // Filtered Todos
+  const filteredTodos = todos.filter((todo) => {
+    if (filter === 'active') return !todo.completed;
+    if (filter === 'completed') return todo.completed;
+    return true;
+  });
 
-  const handleShowCompletedChange = (e) => {
-    setShowCompleted(e.target.checked);
+  // Metrics
+  const completedCount = todos.filter((t) => t.completed).length;
+  const progress = todos.length ? Math.round((completedCount / todos.length) * 100) : 0;
+
+  const priorityColors = {
+    high: 'bg-red-500/10 text-red-500 border-red-500/20',
+    medium: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+    low: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
   };
 
   return (
-    <>
-      <main className="bg-white rounded-2xl w-[80%] h-[90vh] overflow-auto">
-        {/* Header with date */}
-        <h1 className="ml-4 mt-4 font-bold text-2xl text-gray-800">Today</h1>
-        <h3 className="ml-4 text-[10px]">{day}/{month}/{year}</h3>
-        <hr className="ml-[1rem] mr-[1rem] mt-[10px]" />
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
+      <div className="w-full max-w-xl bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-8">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
+              Task Dashboard
+            </h1>
+            <p className="text-slate-400 text-sm mt-1">Manage your daily priorities</p>
+          </div>
+          <span className="text-xs px-3 py-1 bg-slate-800 text-slate-300 rounded-full border border-slate-700">
+            {completedCount}/{todos.length} Done
+          </span>
+        </div>
 
-        {/* Add New Task Button */}
-        <figure
-          onClick={openDialog}
-          className="flex ml-4 mt-4 gap-2 items-center bg-gray-300 w-40 justify-center p-2 rounded-full transition-all duration-300 ease-in-out hover:scale-105 hover:cursor-pointer hover:bg-gray-600"
-        >
-          <img className="invert" src={add} alt="" />
-          <span>Add New Task</span>
-        </figure>
-
-        {/* Show completed tasks toggle */}
-        <figure className="flex items-center">
-          <input 
-            className="ml-4 mt-3" 
-            type="checkbox" 
-            checked={showCompleted}
-            onChange={handleShowCompletedChange} 
+        {/* Progress Bar */}
+        <div className="w-full bg-slate-800 h-2 rounded-full mb-6 overflow-hidden">
+          <div
+            className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full transition-all duration-300"
+            style={{ width: `${progress}%` }}
           />
-          <span className="ml-4 mt-3">Show Completed Tasks</span>
-        </figure>
+        </div>
 
-        {/* Modal dialog for adding new task */}
-        <dialog ref={dialogRef} className="h-[20rem] w-[20rem] rounded-xl p-4 text-center">
-          <h2 className="text-lg font-bold mb-4">Enter New Task</h2>
+        {/* Input Form */}
+        <form onSubmit={addTodo} className="flex flex-col sm:flex-row gap-3 mb-6">
           <input
             type="text"
-            value={newTask}
-            onChange={(e) => setNewTask(e.target.value)}
-            className="border border-gray-400 p-2 w-full rounded mb-4"
-            placeholder="Your task here..."
+            placeholder="Add a new task..."
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 text-slate-100 placeholder-slate-500 transition-colors"
           />
-          <button
-            onClick={handleAddTask}
-            className="bg-gray-300 text-white px-4 py-2 rounded hover:bg-gray-600"
-          >
-            Done
-          </button>
-        </dialog>
+          <div className="flex gap-2">
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-3 text-xs focus:outline-none focus:border-cyan-500 text-slate-300 capitalize cursor-pointer"
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+            <button
+              type="submit"
+              className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-medium text-sm px-5 py-3 rounded-xl transition-all shadow-lg shadow-cyan-500/20 active:scale-95"
+            >
+              Add
+            </button>
+          </div>
+        </form>
 
-        {/* Display all tasks */}
-        <section>
-          <h2 className="ml-4 mt-2 font-bold text-gray-800 underline">Your Assignment Awaits</h2>
-          <figure>
-            {tasks.map((task, index) => {
-              if (!showCompleted && completedTasks.includes(index)) return null;
-              
-              return (
-                <section key={index} className="flex items-center justify-between">
-                  <section className="ml-4 mt-2 flex items-center gap-2 font-semibold">
-                    <input 
-                      type="checkbox" 
-                      checked={completedTasks.includes(index)}
-                      onChange={() => handleTaskToggle(index)}
+        {/* Filter Tabs */}
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+          <div className="flex gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
+            {['all', 'active', 'completed'].map((type) => (
+              <button
+                key={type}
+                onClick={() => setFilter(type)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${
+                  filter === type
+                    ? 'bg-slate-800 text-cyan-400 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+          {completedCount > 0 && (
+            <button
+              onClick={clearCompleted}
+              className="text-xs text-rose-400 hover:text-rose-300 transition-colors"
+            >
+              Clear completed
+            </button>
+          )}
+        </div>
+
+        {/* Task List */}
+        <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+          {filteredTodos.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 text-sm">
+              No tasks found. Time to relax!
+            </div>
+          ) : (
+            filteredTodos.map((todo) => (
+              <div
+                key={todo.id}
+                className={`group flex items-center justify-between p-3.5 rounded-xl border transition-all ${
+                  todo.completed
+                    ? 'bg-slate-950/40 border-slate-800/50 opacity-60'
+                    : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">
+                  <input
+                    type="checkbox"
+                    checked={todo.completed}
+                    onChange={() => toggleTodo(todo.id)}
+                    className="w-4 h-4 rounded border-slate-700 text-cyan-500 focus:ring-0 focus:ring-offset-0 bg-slate-900 cursor-pointer"
+                  />
+                  {editingId === todo.id ? (
+                    <input
+                      type="text"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onBlur={() => saveEdit(todo.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && saveEdit(todo.id)}
+                      autoFocus
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm text-slate-100 focus:outline-none"
                     />
-                    {editingIndex === index ? (
-                      <input
-                        type="text"
-                        value={editedTask}
-                        onChange={(e) => setEditedTask(e.target.value)}
-                        className="border border-gray-400 p-1 rounded"
-                        autoFocus
-                      />
-                    ) : (
-                      <h1 className={completedTasks.includes(index) ? 'line-through text-gray-400' : ''}>
-                        {task}
-                      </h1>
-                    )}
-                  </section>
-                  <section className="flex items-center gap-4 mr-4">
-                    {editingIndex === index ? (
-                      <>
-                        <button
-                          onClick={() => saveEdit(index)}
-                          className="text-green-600 hover:text-green-800 cursor-pointer transition-colors duration-200 text-xl"
-                          title="Save"
-                        >
-                          ✓
-                        </button>
-                        <button
-                          onClick={cancelEdit}
-                          className="text-red-600 hover:text-red-800 cursor-pointer transition-colors duration-200 text-xl"
-                          title="Cancel"
-                        >
-                          ✗
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <img
-                          className="invert cursor-pointer hover:opacity-80 transition-opacity duration-200"
-                          onClick={() => handleEdit(index)}
-                          src={edit}
-                          alt="Edit"
-                          title="Edit task"
-                        />
-                        <img
-                          className="invert cursor-pointer hover:opacity-80 transition-opacity duration-200"
-                          onClick={() => handleDel(index)}
-                          src={del}
-                          alt="Delete"
-                          title="Delete task"
-                        />
-                      </>
-                    )}
-                  </section>
-                </section>
-              );
-            })}
-          </figure>
-        </section>
-      </main>
-    </>
+                  ) : (
+                    <span
+                      onClick={() => toggleTodo(todo.id)}
+                      className={`text-sm cursor-pointer truncate ${
+                        todo.completed ? 'line-through text-slate-500' : 'text-slate-200'
+                      }`}
+                    >
+                      {todo.text}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded border ${
+                      priorityColors[todo.priority]
+                    }`}
+                  >
+                    {todo.priority}
+                  </span>
+                  
+                  {editingId !== todo.id && (
+                    <button
+                      onClick={() => startEditing(todo)}
+                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyan-400 text-xs px-1.5 py-1 transition-opacity"
+                    >
+                      Edit
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => deleteTodo(todo.id)}
+                    className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-400 text-xs px-1.5 py-1 transition-opacity"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+      </div>
+    </div>
   );
 }
-
-createRoot(document.getElementById('root')).render(<App />);
